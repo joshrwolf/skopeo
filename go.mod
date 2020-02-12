@@ -10,6 +10,7 @@ require (
 	github.com/containers/storage v1.15.8
 	github.com/docker/docker v1.4.2-0.20191101170500-ac7306503d23
 	github.com/dsnet/compress v0.0.1 // indirect
+	github.com/ghodss/yaml v1.0.0
 	github.com/go-check/check v0.0.0-20180628173108-788fd7840127
 	github.com/gogo/protobuf v1.3.1 // indirect
 	github.com/google/gofuzz v1.1.0 // indirect
