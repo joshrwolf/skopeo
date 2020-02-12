@@ -16,6 +16,7 @@ require (
 	github.com/opencontainers/image-tools v0.0.0-20170926011501-6d941547fa1d
 	github.com/opencontainers/runtime-spec v1.0.0 // indirect
 	github.com/pkg/errors v0.9.1
+	github.com/prometheus/common v0.6.0
 	github.com/russross/blackfriday v2.0.0+incompatible // indirect
 	github.com/sirupsen/logrus v1.4.2
 	github.com/stretchr/testify v1.4.0
@@ -24,4 +25,7 @@ require (
 	github.com/vbauerster/mpb v3.4.0+incompatible // indirect
 	go4.org v0.0.0-20190218023631-ce4c26f7be8e // indirect
 	gopkg.in/yaml.v2 v2.2.8
+	k8s.io/apimachinery v0.17.3
+	k8s.io/cli-runtime v0.17.3
+	sigs.k8s.io/kustomize v2.0.3+incompatible
 )
