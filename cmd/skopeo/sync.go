@@ -379,7 +379,7 @@ func imagesToCopyFromKustomizeManifests(kustomizePath string, sourceCtx types.Sy
 	for _, image := range images {
 		logrus.WithFields(logrus.Fields{}).Infof("Parsing image: %s", image)
 
-		ref, err := docker.ParseReference(image)
+		ref, err := docker.ParseReference(fmt.Sprintf("//%s", image))
 		if err != nil {
 			return nil, errors.Wrapf(err, fmt.Sprintf("cannot obtain a valid image reference for transport %q and reference %q", docker.Transport.Name(), image))
 		}
