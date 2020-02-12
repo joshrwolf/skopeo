@@ -2,6 +2,7 @@ package main
 
 import (
 	"flag"
+	"fmt"
 	"testing"
 
 	"github.com/containers/image/v5/types"
@@ -224,4 +225,29 @@ func TestImageOptionsAuthfileOverride(t *testing.T) {
 			AuthFilePath: testCase.expectedAuthfilePath,
 		}, res)
 	}
+}
+
+func TestParseImagesFromManifests(t *testing.T) {
+	yaml := `
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nginx
+  annotations:
+    extraimages: "extraImage:latest,extraImage:notlatest"
+spec:
+  template:
+  metadata:
+    labels:
+      app: nginx
+  spec:
+    containers:
+    - image: nginx:1.17.6
+      name: nginx
+    - image: nginx
+      name: nginx-tagless
+`
+
+	images := parseImagesFromManifests(yaml)
+	fmt.Println(images)
 }

@@ -2,14 +2,24 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"io"
+	"regexp"
 	"strings"
 
 	"github.com/containers/image/v5/pkg/compression"
 	"github.com/containers/image/v5/transports/alltransports"
 	"github.com/containers/image/v5/types"
 	"github.com/pkg/errors"
+	"github.com/prometheus/common/log"
 	"github.com/urfave/cli"
+	"gopkg.in/yaml.v2"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+)
+
+var (
+	yamlSep              = regexp.MustCompile(`\n---`)
+	extraImageAnnotation = "skopeo.io/extraimages"
 )
 
 // errorShouldDisplayUsage is a subtype of error used by command handlers to indicate that cli.ShowSubcommandHelp should be called.
@@ -298,4 +308,71 @@ func parseImageSource(ctx context.Context, opts *imageOptions, name string) (typ
 		return nil, err
 	}
 	return ref.NewImageSource(ctx, sys)
+}
+
+// UnmarshalUnstructuredYAML takes in a YAML data as a string and returns a list of metav1.unstructured type objects
+func unmarshalUnstructuredK8s(data string) (objs []*unstructured.Unstructured) {
+	// Split the yaml data into parts based off the yaml sep
+	parts := yamlSep.Split(data, -1)
+
+	// Loop over each part and unmarshal
+	for _, part := range parts {
+		// Check for empty yaml
+		if len(part) == 0 {
+			log.Debugf("Empty manifests found, skipping...")
+			continue
+		}
+
+		var obj unstructured.Unstructured
+		err := yaml.Unmarshal([]byte(part), &obj)
+		if err != nil {
+			log.Fatalf("Failed to unmarshal map into unstructured resource: %v", err)
+		}
+
+		objs = append(objs, &obj)
+	}
+	return
+}
+
+func parseImagesFromManifests(yaml string) (images []string) {
+	objs := unmarshalUnstructuredK8s(yaml)
+
+	for _, obj := range objs {
+		// Loop through every yaml obj recursively until done
+		images = append(images, walkImage(obj.Object)...)
+
+		// Get any annotations
+		for k, v := range obj.GetAnnotations() {
+			// If we stumble upon the right annotation in a resource, add extra images to the list
+			if k == extraImageAnnotation {
+				images = append(images, strings.Split(v, ",")...)
+			}
+		}
+	}
+	return
+}
+
+func walkImage(obj map[string]interface{}) (images []string) {
+	for k, v := range obj {
+
+		// If we're at an array (such as the ones that containers are stored at)
+		if array, ok := v.([]interface{}); ok {
+			// containers are the only thing that have images so they're the only things we care about (in this search)
+			if k == "containers" || k == "initContainers" {
+				for _, obj := range array {
+					if mapObj, isMap := obj.(map[string]interface{}); isMap {
+						if image, isImage := mapObj["image"]; isImage {
+							// Convert (to string) and append to list of images
+							images = append(images, fmt.Sprintf("%s", image))
+						}
+					}
+				}
+			}
+		} else if objMap, ok := v.(map[string]interface{}); ok {
+			// Keep digging until we run out of maps or find a container
+			images = append(images, walkImage(objMap)...)
+		}
+	}
+
+	return
 }

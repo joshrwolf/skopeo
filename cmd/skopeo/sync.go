@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"io"
@@ -20,6 +21,8 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
 	"gopkg.in/yaml.v2"
+	extKust "k8s.io/cli-runtime/pkg/kustomize"
+	"sigs.k8s.io/kustomize/pkg/fs"
 )
 
 // syncOptions contains information retrieved from the skopeo sync command line.
@@ -77,7 +80,7 @@ func syncCmd(global *globalOptions) cli.Command {
 
 	Copy all the images from a SOURCE to a DESTINATION.
 
-	Allowed SOURCE transports (specified with --src): docker, dir, yaml.
+	Allowed SOURCE transports (specified with --src): docker, dir, yaml, k8s.
 	Allowed DESTINATION transports (specified with --dest): docker, dir.
 
 	See skopeo-sync(1) for details.
@@ -353,6 +356,38 @@ func imagesToCopyFromRegistry(registryName string, cfg registrySyncConfig, sourc
 	return repoDescList, nil
 }
 
+func imagesToCopyFromKustomizeManifests(kustomizePath string, sourceCtx types.SystemContext) ([]types.ImageReference, error) {
+	// Parse kustomize manifests
+	var buildOutput bytes.Buffer
+
+	err := extKust.RunKustomizeBuild(&buildOutput, fs.MakeRealFS(), kustomizePath)
+	if err != nil {
+		return nil, errors.Wrapf(err, fmt.Sprintf("cannot generate manifests given kustomize path: %q", kustomizePath))
+	}
+
+	fmt.Println(buildOutput.String())
+	images := parseImagesFromManifests(buildOutput.String())
+
+	if len(images) == 0 {
+		logrus.WithFields(logrus.Fields{
+			"kustomizePath": kustomizePath,
+		}).Warnf("No images found in generated manifests")
+	}
+
+	var sourceReferences []types.ImageReference
+
+	for _, image := range images {
+		logrus.WithFields(logrus.Fields{}).Infof("Parsing image: %s", image)
+
+		ref, err := docker.ParseReference(image)
+		if err != nil {
+			return nil, errors.Wrapf(err, fmt.Sprintf("cannot obtain a valid image reference for transport %q and reference %q", docker.Transport.Name(), image))
+		}
+		sourceReferences = append(sourceReferences, ref)
+	}
+	return sourceReferences, nil
+}
+
 // imagesToCopy retrieves all the images to copy from a specified sync source
 // and transport.
 // It returns a slice of repository descriptors, where each descriptor is a
@@ -433,6 +468,20 @@ func imagesToCopy(source string, transport string, sourceCtx *types.SystemContex
 			}
 			descriptors = append(descriptors, descs...)
 		}
+	case "k8s":
+		// Given kubernetes manifests (only kustomize for now), parse a list of images
+		descs := repoDescriptor{
+			Context: sourceCtx,
+		}
+
+		taggedImagesFromManifests, err := imagesToCopyFromKustomizeManifests(source, *sourceCtx)
+		if err != nil {
+			return descriptors, err
+		}
+
+		descs.TaggedImages = taggedImagesFromManifests
+
+		descriptors = append(descriptors, descs)
 	}
 
 	return descriptors, nil
@@ -462,7 +511,7 @@ func (opts *syncOptions) run(args []string, stdout io.Writer) error {
 	if len(opts.source) == 0 {
 		return errors.New("A source transport must be specified")
 	}
-	if !contains(opts.source, []string{docker.Transport.Name(), directory.Transport.Name(), "yaml"}) {
+	if !contains(opts.source, []string{docker.Transport.Name(), directory.Transport.Name(), "yaml", "k8s"}) {
 		return errors.Errorf("%q is not a valid source transport", opts.source)
 	}
 
