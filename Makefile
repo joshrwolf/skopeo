@@ -29,7 +29,8 @@ ifeq ($(GOBIN),)
 GOBIN := $(GOPATH)/bin
 endif
 
-CONTAINER_RUNTIME := $(shell command -v podman 2> /dev/null || echo docker)
+# CONTAINER_RUNTIME := $(shell command -v podman 2> /dev/null || echo docker)
+CONTAINER_RUNTIME := $(shell echo docker)
 GOMD2MAN ?= $(shell command -v go-md2man || echo '$(GOBIN)/go-md2man')
 
 # Go module support: set `-mod=vendor` to use the vendored sources.
