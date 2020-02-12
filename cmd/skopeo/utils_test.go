@@ -2,7 +2,7 @@ package main
 
 import (
 	"flag"
-	"fmt"
+	"reflect"
 	"testing"
 
 	"github.com/containers/image/v5/types"
@@ -234,7 +234,7 @@ kind: Deployment
 metadata:
   name: nginx
   annotations:
-    extraimages: "extraImage:latest,extraImage:notlatest"
+    skopeo.io/extraimages: "extraImage:latest,extraImage:notlatest"
 spec:
   template:
   metadata:
@@ -248,6 +248,10 @@ spec:
       name: nginx-tagless
 `
 
-	images := parseImagesFromManifests(yaml)
-	fmt.Println(images)
+	want := []string{"nginx:1.17.6", "nginx", "extraImage:latest", "extraImage:notlatest"}
+
+	got := parseImagesFromManifests(yaml)
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("parseImagesFromManifests() = %v, want %v", got, want)
+	}
 }
