@@ -10,10 +10,10 @@ import (
 	"github.com/containers/image/v5/pkg/compression"
 	"github.com/containers/image/v5/transports/alltransports"
 	"github.com/containers/image/v5/types"
+	"github.com/ghodss/yaml"
 	"github.com/pkg/errors"
 	"github.com/prometheus/common/log"
 	"github.com/urfave/cli"
-	"gopkg.in/yaml.v2"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
 
